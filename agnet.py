@@ -4,7 +4,7 @@ class Agent:
         self.__playing = False
         self.__decision_maker = decision_maker
         self.__memory = memory
-        self.__episodes_periode = 10
+        self.__training_frequency = 10
 
     def play(self):
         self.__playing = True
@@ -18,11 +18,13 @@ class Agent:
                 action = self.__decision_maker.making_decision(state)
                 self.__env.act(action)
                 observation, reward, episode_finished = self.__env.percept()
+                self.__memory.save_state(state, reward, action)
                 state = self.__memory.get_state(observation)
             self.finalizing_episode(episode_counter)
             episode_counter += 1
 
     def finalizing_episode(self, episode_counter):
-        if episode_counter % self.__episodes_periode == 0:
+        if episode_counter % self.__training_frequency == 0:
+
             print("Finishing episode")
         pass
