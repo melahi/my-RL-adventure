@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import multiprocessing
 
 
 class DecisionMaker:
@@ -24,6 +25,10 @@ class DecisionMaker:
         # variable and then used in the `input_generation_for_prediction` function to provide the input for the model,
         # then the model will make the decision.
         self.__need_to_predict = None
+        self.__provided_input = multiprocessing.Semaphore(0)
+
+    def __del__(self):
+        self.__terminate_decision_process()
 
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope("Decision_Making"):
@@ -66,12 +71,17 @@ class DecisionMaker:
             return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
     def __input_generator_for_prediction(self):
-
+        while True:
+            self.__provided_input.acquire()
+            if self.__need_to_predict is None:
+                return
+            yield self.__need_to_predict
 
     def __start_decision_process(self):
         if self.__decision_process_started:
             return
         self.__decision_process_started = True
+        self.__provided_input = multiprocessing.Semaphore(0)
         features_type = tf.float32
         features_shape = tf.TensorShape([None, self.__width, self.__height, self.__frames, 1])
         input_generator = tf.data.Dataset.from_generator(self.__input_generator_for_prediction,
@@ -101,4 +111,5 @@ class DecisionMaker:
         if not self.__decision_process_started:
             self.__start_decision_process()
         self.__need_to_predict = np.array([state])
+        self.__provided_input.release()
         return next(self.__prediction_function)
