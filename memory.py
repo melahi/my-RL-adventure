@@ -45,7 +45,27 @@ class Memory:
             if not experience.add_reward(reward):
                 # It means that this experience still needs to know rewards of future states.
                 new_uncompleted_experience_list.append(experience)
+            else:
+                self.__memorized_experiences.append(experience)
         self.__uncompleted_experiences = new_uncompleted_experience_list
+
+    def remember_experience(self, batch_size=128):
+        random.shuffle(self.__memorized_experiences)
+        states_shape = [batch_size]
+        states_shape.extend(self.__last_state)
+        states = np.zeros(states_shape)
+        actions = np.zeros([batch_size, 1])
+        rewards = np.zeros([batch_size, 1])
+        starting_index = 0
+        experience_count = len(self.__memorized_experiences)
+        while starting_index < experience_count:
+            batch_size = min(starting_index + batch_size, experience_count) - starting_index
+            for idx in range(batch_size):
+                states[idx] = self.__memorized_experiences[starting_index + idx].state
+                actions[idx, 0] = self.__memorized_experiences[starting_index + idx].action
+                rewards[idx, 0] = self.__memorized_experiences[starting_index + idx].reward
+            yield states[:batch_size], actions[:batch_size], rewards[:batch_size]
+            starting_index += batch_size
 
 
 class Experience:
@@ -70,6 +90,6 @@ class Experience:
         self.reward += self.__gamma_coefficient * reward
         self.__gamma_coefficient *= self.__gamma
         self.__need_to_know_reward_counter -= 1
-        if self.need_to_know_reward_counter == 0:
+        if self.__need_to_know_reward_counter == 0:
             return True
         return False

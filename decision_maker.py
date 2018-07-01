@@ -30,6 +30,9 @@ class DecisionMaker:
     def __del__(self):
         self.__terminate_decision_process()
 
+    def reset(self):
+        self.__terminate_decision_process()
+
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope("Decision_Making"):
             net = features
@@ -77,13 +80,23 @@ class DecisionMaker:
                 return
             yield self.__need_to_predict
 
+    def __get_features_structure(self):
+        features_type = tf.float32
+        features_shape = tf.TensorShape([None, self.__width, self.__height, self.__frames, 1])
+        return features_type, features_shape
+
+    @staticmethod
+    def __get_labels_structure():
+        labels_type = {'q_value': tf.float32, 'committed_action': tf.uint8}
+        labels_shape = {'q_value': tf.TensorShape([None, 1]), 'committed_action': tf.TensorShape([None, 1])}
+        return labels_type, labels_shape
+
     def __start_decision_process(self):
         if self.__decision_process_started:
             return
         self.__decision_process_started = True
         self.__provided_input = multiprocessing.Semaphore(0)
-        features_type = tf.float32
-        features_shape = tf.TensorShape([None, self.__width, self.__height, self.__frames, 1])
+        features_type, features_shape = self.__get_features_structure()
         input_generator = tf.data.Dataset.from_generator(self.__input_generator_for_prediction,
                                                          features_type,
                                                          features_shape)
@@ -113,3 +126,13 @@ class DecisionMaker:
         self.__need_to_predict = np.array([state])
         self.__provided_input.release()
         return next(self.__prediction_function)
+
+    def train(self, input_generator):
+        features_type, features_shape = self.__get_features_structure()
+        labels_type, labels_shape = self.__get_labels_structure()
+        input_generator = tf.data.Dataset.from_generator(input_generator,
+                                                         (features_type, labels_type),
+                                                         (features_shape, labels_shape))
+        training_output = self.__model.train(input_fn=input_generator)
+        print("Training is finished with this result:", training_output)
+

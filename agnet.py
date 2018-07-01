@@ -1,5 +1,10 @@
+from memory import Memory
+from decision_maker import DecisionMaker
+from environment import Environment
+
+
 class Agent:
-    def __init__(self, environment, decision_maker, memory):
+    def __init__(self, environment: Environment, decision_maker: DecisionMaker, memory: Memory):
         self.__env = environment
         self.__playing = False
         self.__decision_maker = decision_maker
@@ -11,6 +16,7 @@ class Agent:
         episode_counter = 0
         while self.__playing:
             self.__memory.reset()
+            self.__decision_maker.reset()
             observation = self.__env.reset()
             state = self.__memory.get_state(observation)
             episode_finished = False
@@ -25,6 +31,4 @@ class Agent:
 
     def finalizing_episode(self, episode_counter):
         if episode_counter % self.__training_frequency == 0:
-
-            print("Finishing episode")
-        pass
+            self.__decision_maker.train(self.__memory.remember_experience())
