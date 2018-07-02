@@ -1,13 +1,11 @@
+import gym
 import random
-
-import cv2
 import numpy as np
 
 
 class Memory:
     def __init__(self,
-                 observing_width,
-                 observing_height,
+                 observation_space,
                  needed_observation_for_state=1,
                  memorizing_experiences_capacity=1000000,
                  look_ahead_state_for_reward_estimation=1,
@@ -15,7 +13,9 @@ class Memory:
                  gamma=0.95):
         assert look_ahead_state_for_reward_estimation > 0, "look_ahead_state_for_reward_estimation should be greater" \
                                                            "than zero."
-        self.__last_state = np.zeros(shape=[observing_width, observing_height, needed_observation_for_state])
+        assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
+                                                                          "satisfy our assumptions"
+        self.__last_state = np.zeros(shape=[*observation_space.shape, needed_observation_for_state])
         self.__memorizing_experiences_capacity = memorizing_experiences_capacity
         self.__look_ahead_state_for_reward_estimation = look_ahead_state_for_reward_estimation
         self.__sampling_probability = sampling_probability
@@ -29,6 +29,7 @@ class Memory:
         self.__uncompleted_experiences = list()
 
     def get_state(self, observation):
+        """Completing current state based on new observation."""
         self.__last_state[:, :, :-1] = self.__last_state[:, :, 1:]
         self.__last_state[:, :, -1] = observation
         return self.__last_state
@@ -50,8 +51,7 @@ class Memory:
 
     def remember_experience(self, batch_size=128):
         random.shuffle(self.__memorized_experiences)
-        states_shape = [batch_size]
-        states_shape.extend(self.__last_state)
+        states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
         actions = np.zeros([batch_size, 1])
         rewards = np.zeros([batch_size, 1])
@@ -65,6 +65,16 @@ class Memory:
                 rewards[idx, 0] = self.__memorized_experiences[starting_index + idx].reward
             yield states[:batch_size], actions[:batch_size], rewards[:batch_size]
             starting_index += batch_size
+
+    @staticmethod
+    def __check_environment_assumptions(observation_space):
+        if not hasattr(observation_space, 'shape'):
+            print("observation_space does not have 'shape' attribute")
+            return False
+        if len(observation_space.shape) != 2:
+            print("observation_space should be rank-2 tensor.")
+            return False
+        return True
 
 
 class Experience:

@@ -5,7 +5,7 @@ import multiprocessing
 
 
 class DecisionMaker:
-    def __init__(self, width, height, frames, number_of_actions: int, learning_rate: float=0.001):
+    def __init__(self, state_space, number_of_actions: int, learning_rate: float=0.001):
         self._model_name = "DeepQN"
         self.__learning_rate = learning_rate
         self.__conv_filter_count = [32, 64, 64]
@@ -13,9 +13,7 @@ class DecisionMaker:
         self.__conv_stride = [4, 2, 1]
         self.__fully_connected_units = [512]
         self.__number_of_actions = number_of_actions
-        self.__width = width
-        self.__height = height
-        self.__frames = frames
+        self.__state_space = state_space
         self.__decision_process_started = False
         self.__prediction_function = None
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
@@ -39,7 +37,7 @@ class DecisionMaker:
             for layer_index, filter_count, filter_size, stride in enumerate(zip(self.__conv_filter_count,
                                                                                 self.__conv_filter_size,
                                                                                 self.__conv_stride)):
-                net = tf.layers.conv3d(inputs=net,
+                net = tf.layers.conv2d(inputs=net,
                                        filters=filter_count,
                                        kernel_size=filter_size,
                                        stide=stride,
@@ -82,7 +80,7 @@ class DecisionMaker:
 
     def __get_features_structure(self):
         features_type = tf.float32
-        features_shape = tf.TensorShape([None, self.__width, self.__height, self.__frames, 1])
+        features_shape = tf.TensorShape([None, *self.__state_space])
         return features_type, features_shape
 
     @staticmethod
