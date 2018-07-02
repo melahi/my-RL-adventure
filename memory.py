@@ -29,7 +29,6 @@ class Memory:
         self.__uncompleted_experiences = list()
 
     def get_state(self, observation):
-        observation = cv2.cvtColor(observation, cv2.COLOR_RGB2GRAY)
         self.__last_state[:, :, :-1] = self.__last_state[:, :, 1:]
         self.__last_state[:, :, -1] = observation
         return self.__last_state

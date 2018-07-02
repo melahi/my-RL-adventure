@@ -22,8 +22,8 @@ class Agent:
             episode_finished = False
             while not episode_finished:
                 action = self.__decision_maker.making_decision(state)
-                self.__env.act(action)
-                observation, reward, episode_finished = self.__env.percept()
+                self.__env.action(action)
+                observation, reward, episode_finished = self.__env.perception()
                 self.__memory.save_state(state, reward, action)
                 state = self.__memory.get_state(observation)
             self.finalizing_episode(episode_counter)
