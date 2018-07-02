@@ -127,15 +127,14 @@ class DecisionMaker:
             self.__start_decision_process()
         self.__need_to_predict = np.array([state])
         self.__provided_input.release()
-        return next(self.__prediction_function)
+        return next(self.__prediction_function)['selected_action']
 
     def train(self, input_generator):
         features_type, features_shape = self.__get_features_structure()
         labels_type, labels_shape = self.__get_labels_structure()
         types = (features_type, labels_type)
         shapes = (features_shape, labels_shape)
-        training_output = self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(input_generator,
-                                                                                             types,
-                                                                                             shapes))
-        print("Training is finished with this result:", training_output)
+        self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(input_generator,
+                                                                           types,
+                                                                           shapes))
 

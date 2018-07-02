@@ -62,7 +62,7 @@ class Memory:
         random.shuffle(memorized_experiences)
         states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
-        actions = np.zeros([batch_size])
+        actions = np.zeros([batch_size], dtype=np.uint8)
         rewards = np.zeros([batch_size, self.__number_of_actions])
         starting_index = 0
 
@@ -72,7 +72,7 @@ class Memory:
                 states[idx] = memorized_experiences[starting_index + idx].state
                 actions[idx] = memorized_experiences[starting_index + idx].action
                 rewards[idx, actions[idx]] = memorized_experiences[starting_index + idx].reward
-            yield states[:batch_size], actions[:batch_size], rewards[:batch_size]
+            yield (states[:batch_size], {'committed_action': actions[:batch_size], 'q_value': rewards[:batch_size]})
             starting_index += batch_size
 
     @staticmethod
