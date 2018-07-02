@@ -30,9 +30,6 @@ class DecisionMaker:
     def __del__(self):
         self.__terminate_decision_process()
 
-    def reset(self):
-        self.__terminate_decision_process()
-
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope("Decision_Making"):
             net = features
@@ -130,6 +127,7 @@ class DecisionMaker:
         return next(self.__prediction_function)['selected_action']
 
     def train(self, input_generator):
+        self.__terminate_decision_process()
         features_type, features_shape = self.__get_features_structure()
         labels_type, labels_shape = self.__get_labels_structure()
         types = (features_type, labels_type)
