@@ -5,6 +5,10 @@ from env.atari_wrappers import make_atari, wrap_deepmind
 
 
 class Environment:
+    """
+    A class mostly based on gym's Environment but with different API for supporting async and real-time
+    environments.
+    """
     def __init__(self, game: str, monitor_path: str=None):
         self.__create_environment(monitor_path, game)
 
