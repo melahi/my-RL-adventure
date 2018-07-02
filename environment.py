@@ -25,9 +25,10 @@ class Environment:
         self.__last_observation, self.__last_reward, self.__episode_finished, _ = self.__env.step(action_id)
 
     def reset(self):
-        self.__last_observation = None
+        self.__last_observation = self.__env.reset()
         self.__last_reward = None
         self.__episode_finished = None
+        return self.__last_observation
 
     def __create_environment(self, monitor_path, game):
         self.__env = make_atari(game + "NoFrameskip-v4")

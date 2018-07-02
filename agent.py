@@ -10,6 +10,7 @@ class Agent:
         self.__decision_maker = decision_maker
         self.__memory = memory
         self.__training_frequency = 10
+        self.finalizing_episode(0)
 
     def play(self):
         self.__playing = True
@@ -31,4 +32,4 @@ class Agent:
 
     def finalizing_episode(self, episode_counter):
         if episode_counter % self.__training_frequency == 0:
-            self.__decision_maker.train(self.__memory.remember_experience())
+            self.__decision_maker.train(self.__memory.remember_experience)

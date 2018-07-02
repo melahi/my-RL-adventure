@@ -6,8 +6,9 @@ import numpy as np
 class Memory:
     def __init__(self,
                  observation_space,
+                 number_of_actions,
                  needed_observation_for_state=1,
-                 memorizing_experiences_capacity=1000000,
+                 memory_capacity=1000000,
                  look_ahead_state_for_reward_estimation=1,
                  sampling_probability=0.3,
                  gamma=0.95):
@@ -16,12 +17,13 @@ class Memory:
         assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
                                                                           "satisfy our assumptions"
         self.__last_state = np.zeros(shape=[*observation_space.shape, needed_observation_for_state])
-        self.__memorizing_experiences_capacity = memorizing_experiences_capacity
+        self.__number_of_actions = number_of_actions
+        self.__memory_capacity = memory_capacity
         self.__look_ahead_state_for_reward_estimation = look_ahead_state_for_reward_estimation
         self.__sampling_probability = sampling_probability
         self.__gamma = gamma
         self.__uncompleted_experiences = list()
-        self.__memorized_experiences = [None] * self.__memorizing_experiences_capacity
+        self.__memorized_experiences = [None] * self.__memory_capacity
         self.__next_memory_slot = 0
 
     def reset(self):
@@ -46,23 +48,30 @@ class Memory:
                 # It means that this experience still needs to know rewards of future states.
                 new_uncompleted_experience_list.append(experience)
             else:
-                self.__memorized_experiences.append(experience)
+                self.__memorized_experiences[self.__next_memory_slot] = experience
+                self.__next_memory_slot = (self.__next_memory_slot + 1) % self.__memory_capacity
+
         self.__uncompleted_experiences = new_uncompleted_experience_list
 
     def remember_experience(self, batch_size=128):
-        random.shuffle(self.__memorized_experiences)
+        memorized_experiences = self.__memorized_experiences
+        experience_count = self.__memory_capacity
+        if memorized_experiences[self.__next_memory_slot] is None:
+            experience_count = self.__next_memory_slot
+            memorized_experiences = memorized_experiences[:experience_count]
+        random.shuffle(memorized_experiences)
         states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
-        actions = np.zeros([batch_size, 1])
-        rewards = np.zeros([batch_size, 1])
+        actions = np.zeros([batch_size])
+        rewards = np.zeros([batch_size, self.__number_of_actions])
         starting_index = 0
-        experience_count = len(self.__memorized_experiences)
+
         while starting_index < experience_count:
             batch_size = min(starting_index + batch_size, experience_count) - starting_index
             for idx in range(batch_size):
-                states[idx] = self.__memorized_experiences[starting_index + idx].state
-                actions[idx, 0] = self.__memorized_experiences[starting_index + idx].action
-                rewards[idx, 0] = self.__memorized_experiences[starting_index + idx].reward
+                states[idx] = memorized_experiences[starting_index + idx].state
+                actions[idx] = memorized_experiences[starting_index + idx].action
+                rewards[idx, actions[idx]] = memorized_experiences[starting_index + idx].reward
             yield states[:batch_size], actions[:batch_size], rewards[:batch_size]
             starting_index += batch_size
 
@@ -72,7 +81,7 @@ class Memory:
             print("observation_space does not have 'shape' attribute")
             return False
         if len(observation_space.shape) != 2:
-            print("observation_space should be rank-2 tensor.")
+            print("observation_space should be a rank-2 tensor.")
             return False
         return True
 

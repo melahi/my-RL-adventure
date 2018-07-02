@@ -5,7 +5,7 @@ import multiprocessing
 
 
 class DecisionMaker:
-    def __init__(self, state_space, number_of_actions: int, learning_rate: float=0.001):
+    def __init__(self, state_space, number_of_actions: int, model_dir: str, learning_rate: float=0.001):
         self._model_name = "DeepQN"
         self.__learning_rate = learning_rate
         self.__conv_filter_count = [32, 64, 64]
@@ -16,8 +16,10 @@ class DecisionMaker:
         self.__state_space = state_space
         self.__decision_process_started = False
         self.__prediction_function = None
+        model_dir = os.path.join(model_dir, "models", self._model_name)
+        os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
-                                              model_dir=os.path.join("./model", self._model_name))
+                                              model_dir=model_dir)
 
         # When a decision for a state is needed to be taken, the state will be stored in the `__needed_to_predict`
         # variable and then used in the `input_generation_for_prediction` function to provide the input for the model,
@@ -34,13 +36,13 @@ class DecisionMaker:
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope("Decision_Making"):
             net = features
-            for layer_index, filter_count, filter_size, stride in enumerate(zip(self.__conv_filter_count,
-                                                                                self.__conv_filter_size,
-                                                                                self.__conv_stride)):
+            for layer_index, (filter_count, filter_size, stride) in enumerate(zip(self.__conv_filter_count,
+                                                                                  self.__conv_filter_size,
+                                                                                  self.__conv_stride)):
                 net = tf.layers.conv2d(inputs=net,
                                        filters=filter_count,
                                        kernel_size=filter_size,
-                                       stide=stride,
+                                       strides=stride,
                                        padding='valid',
                                        name="conv_{}".format(layer_index))
             net = tf.layers.flatten(inputs=net)
@@ -59,10 +61,11 @@ class DecisionMaker:
                     'estimated_q_value': tf.reduce_max(output, axis=1)
                 }
                 return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-            loss = tf.losses.mean_squared_error(labels=labels['q_value'],
-                                                predictions=output,
-                                                weights=tf.one_hot(indices=labels['committed_action'],
-                                                                   depth=self.__number_of_actions))
+            committed_action = tf.one_hot(indices=labels['committed_action'],
+                                          depth=self.__number_of_actions,
+                                          dtype=tf.float32)
+            output = tf.multiply(output, committed_action)
+            loss = tf.losses.mean_squared_error(labels=labels['q_value'], predictions=output)
             tf.summary.scalar('loss', loss)
             if mode == tf.estimator.ModeKeys.EVAL:
                 return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
@@ -80,13 +83,13 @@ class DecisionMaker:
 
     def __get_features_structure(self):
         features_type = tf.float32
-        features_shape = tf.TensorShape([None, *self.__state_space])
+        features_shape = tf.TensorShape([None, *self.__state_space.shape])
         return features_type, features_shape
 
-    @staticmethod
-    def __get_labels_structure():
+    def __get_labels_structure(self):
         labels_type = {'q_value': tf.float32, 'committed_action': tf.uint8}
-        labels_shape = {'q_value': tf.TensorShape([None, 1]), 'committed_action': tf.TensorShape([None, 1])}
+        labels_shape = {'q_value': tf.TensorShape([None, self.__number_of_actions]),
+                        'committed_action': tf.TensorShape([None])}
         return labels_type, labels_shape
 
     def __start_decision_process(self):
@@ -98,7 +101,8 @@ class DecisionMaker:
         input_generator = tf.data.Dataset.from_generator(self.__input_generator_for_prediction,
                                                          features_type,
                                                          features_shape)
-        self.__prediction_function = self.__model.predict(input_fn=input_generator)
+        self.__prediction_function = self.__model.predict(input_fn=lambda: tf.data.Dataset.from_generator(
+            self.__input_generator_for_prediction, features_type, features_shape))
 
     def __terminate_decision_process(self):
         if not self.__decision_process_started:
@@ -128,9 +132,10 @@ class DecisionMaker:
     def train(self, input_generator):
         features_type, features_shape = self.__get_features_structure()
         labels_type, labels_shape = self.__get_labels_structure()
-        input_generator = tf.data.Dataset.from_generator(input_generator,
-                                                         (features_type, labels_type),
-                                                         (features_shape, labels_shape))
-        training_output = self.__model.train(input_fn=input_generator)
+        types = (features_type, labels_type)
+        shapes = (features_shape, labels_shape)
+        training_output = self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(input_generator,
+                                                                                             types,
+                                                                                             shapes))
         print("Training is finished with this result:", training_output)
 
