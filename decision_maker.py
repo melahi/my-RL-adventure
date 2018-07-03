@@ -17,6 +17,8 @@ class DecisionMaker:
         self.__state_space = state_space
         self.__decision_process_started = False
         self.__prediction_function = None
+        self.__exploration_rate = 1.1
+        self.__exploration_rate_decay = 0.0001
         model_dir = os.path.join(model_dir, "models", self._model_name)
         os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
@@ -119,8 +121,7 @@ class DecisionMaker:
         if state is None:
             self.__terminate_decision_process()
             return
-
-        if random.random() < 0.5:
+        if random.random() < self.__exploration_rate:
             return random.randrange(self.__number_of_actions)
 
         if not self.__decision_process_started:
@@ -138,4 +139,5 @@ class DecisionMaker:
         self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(input_generator,
                                                                            types,
                                                                            shapes))
+        self.__exploration_rate = max(0.01, self.__exploration_rate - self.__exploration_rate_decay)
 
