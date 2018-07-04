@@ -17,8 +17,8 @@ class DecisionMaker:
         self.__state_space = state_space
         self.__decision_process_started = False
         self.__prediction_function = None
-        self.__exploration_rate = 1.1
-        self.__exploration_rate_decay = 0.0001
+        self.__exploration_rate = 1
+        self.__exploration_rate_decay = 0.001
         model_dir = os.path.join(model_dir, "models", self._model_name)
         os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
