@@ -130,14 +130,18 @@ class DecisionMaker:
         self.__provided_input.release()
         return next(self.__prediction_function)['selected_action']
 
-    def train(self, input_generator):
+    def train(self, training_input_generator, evaluation_input_generator):
         self.__terminate_decision_process()
         features_type, features_shape = self.__get_features_structure()
         labels_type, labels_shape = self.__get_labels_structure()
         types = (features_type, labels_type)
         shapes = (features_shape, labels_shape)
-        self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(input_generator,
+        self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(training_input_generator,
                                                                            types,
                                                                            shapes))
+        eval_result = self.__model.evaluate(input_fn=lambda: tf.data.Dataset.from_generator(evaluation_input_generator,
+                                                                                            types,
+                                                                                            shapes))
+        print("Evaluation result:", eval_result)
         self.__exploration_rate = max(0.01, self.__exploration_rate - self.__exploration_rate_decay)
 

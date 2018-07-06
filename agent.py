@@ -32,4 +32,5 @@ class Agent:
     def finalizing_episode(self, episode_counter):
         if episode_counter % self.__training_frequency == 0:
             print("Start training in episode:", episode_counter)
-            self.__decision_maker.train(self.__memory.remember_training_experience)
+            self.__decision_maker.train(self.__memory.remember_training_experiences,
+                                        self.__memory.remember_evaluation_experiences)
