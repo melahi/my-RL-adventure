@@ -21,7 +21,7 @@ class Memory:
         self.__number_of_actions = number_of_actions
         self.__training_experiences = collections.deque(maxlen=training_capacity)
         if validation_capacity is None:
-            validation_capacity = training_capacity / 3
+            validation_capacity = int(training_capacity / 3)
         self.__validation_experiences = collections.deque(maxlen=validation_capacity)
         self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
         self.__look_ahead_state_for_reward_estimation = look_ahead_state_for_reward_estimation

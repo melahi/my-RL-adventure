@@ -11,7 +11,7 @@ class LongTermMemory:
         self.__saving_object(self.__memory_path, memory)
 
     def saving_exploration_rate(self, exploration_rate: float):
-        self.__saving_object(self.__exploration_rate_path, exploration_rate)
+        self.__saving_object(self.__exploration_rate_path, exploration_rate, protocol=0)
 
     def restoring_memory_object(self):
         return self.__restoring_object(self.__memory_path)
