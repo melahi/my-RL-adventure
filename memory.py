@@ -1,5 +1,5 @@
-import gym
 import random
+import collections
 import numpy as np
 
 
@@ -8,9 +8,10 @@ class Memory:
                  observation_space,
                  number_of_actions,
                  needed_observation_for_state=1,
-                 memory_capacity=1000000,
-                 look_ahead_state_for_reward_estimation=1,
-                 sampling_probability=0.3,
+                 training_capacity=1000000,
+                 validation_capacity=None,
+                 look_ahead_state_for_reward_estimation=10,
+                 sampling_probability=0.5,
                  gamma=0.95):
         assert look_ahead_state_for_reward_estimation > 0, "look_ahead_state_for_reward_estimation should be greater" \
                                                            "than zero."
@@ -18,13 +19,15 @@ class Memory:
                                                                           "satisfy our assumptions"
         self.__last_state = np.zeros(shape=[*observation_space.shape, needed_observation_for_state])
         self.__number_of_actions = number_of_actions
-        self.__memory_capacity = memory_capacity
+        self.__training_experiences = collections.deque(maxlen=training_capacity)
+        if validation_capacity is None:
+            validation_capacity = training_capacity / 3
+        self.__validation_experiences = collections.deque(maxlen=validation_capacity)
+        self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
         self.__look_ahead_state_for_reward_estimation = look_ahead_state_for_reward_estimation
         self.__sampling_probability = sampling_probability
         self.__gamma = gamma
         self.__uncompleted_experiences = list()
-        self.__memorized_experiences = [None] * self.__memory_capacity
-        self.__next_memory_slot = 0
 
     def reset(self):
         self.__last_state = np.zeros(shape=self.__last_state.shape)
@@ -48,32 +51,40 @@ class Memory:
                 # It means that this experience still needs to know rewards of future states.
                 new_uncompleted_experience_list.append(experience)
             else:
-                self.__memorized_experiences[self.__next_memory_slot] = experience
-                self.__next_memory_slot = (self.__next_memory_slot + 1) % self.__memory_capacity
+                if random.random() < self.__validation_sampling_rate:
+                    self.__validation_experiences.append(experience)
+                else:
+                    self.__training_experiences.append(experience)
 
         self.__uncompleted_experiences = new_uncompleted_experience_list
 
-    def remember_experience(self, batch_size=128):
-        memorized_experiences = self.__memorized_experiences
-        experience_count = self.__memory_capacity
-        if memorized_experiences[self.__next_memory_slot] is None:
-            experience_count = self.__next_memory_slot
-            memorized_experiences = memorized_experiences[:experience_count]
-        random.shuffle(memorized_experiences)
+    def remember_training_experiences(self, batch_size=128):
+        random.shuffle(self.__training_experiences)
+        return self.__remember_experiences(self.__training_experiences, batch_size)
+
+    def remember_evaluation_experiences(self, batch_size=128):
+        return self.__remember_experiences(self.__validation_experiences, batch_size)
+
+    def __remember_experiences(self, memorized_experiences, batch_size):
         states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
         actions = np.zeros([batch_size], dtype=np.uint8)
         rewards = np.zeros([batch_size, self.__number_of_actions])
-        starting_index = 0
-
-        while starting_index < experience_count:
-            batch_size = min(starting_index + batch_size, experience_count) - starting_index
-            for idx in range(batch_size):
-                states[idx] = memorized_experiences[starting_index + idx].state
-                actions[idx] = memorized_experiences[starting_index + idx].action
-                rewards[idx, actions[idx]] = memorized_experiences[starting_index + idx].reward
-            yield (states[:batch_size], {'committed_action': actions[:batch_size], 'q_value': rewards[:batch_size]})
-            starting_index += batch_size
+        batch_index = 0
+        for experience in memorized_experiences:
+            states[batch_index] = experience.state
+            actions[batch_index] = experience.action
+            rewards[batch_index, actions[batch_index]] = experience.reward
+            batch_index += 1
+            if batch_index % batch_size == 0:
+                yield (states, {'committed_action': actions, 'q_value': rewards})
+                # creating another batch
+                batch_index = 0
+                states = np.zeros(states_shape)
+                actions = np.zeros([batch_size], dtype=np.uint8)
+                rewards = np.zeros([batch_size, self.__number_of_actions])
+        if batch_index != 0:
+            yield (states[:batch_index], {'committed_action': actions[:batch_index], 'q_value': rewards[:batch_index]})
 
     @staticmethod
     def __check_environment_assumptions(observation_space):
