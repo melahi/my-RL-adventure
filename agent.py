@@ -1,3 +1,5 @@
+import signal
+
 from memory import Memory
 from decision_maker import DecisionMaker
 from environment import Environment
@@ -11,6 +13,7 @@ class Agent:
         self.__memory = memory
         self.__training_frequency = 50
         self.finalizing_episode(0)
+        signal.signal(signal.SIGINT, self.terminate)
 
     def play(self):
         self.__playing = True
@@ -34,3 +37,8 @@ class Agent:
             print("Start training in episode:", episode_counter)
             self.__decision_maker.train(self.__memory.remember_training_experiences,
                                         self.__memory.remember_evaluation_experiences)
+
+    def terminate(self, signum=signal.SIGINT, frame=None):
+        print("Terminating gracefully ...")
+        self.__playing = False
+
