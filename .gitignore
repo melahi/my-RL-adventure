@@ -1,3 +1,4 @@
 .idea/
 rl-adventure/
 venv/
+*__pycache__/

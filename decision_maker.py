@@ -69,8 +69,9 @@ class DecisionMaker:
         eval_result = self.__model.evaluate(input_fn=lambda: tf.data.Dataset.from_generator(evaluation_input_generator,
                                                                                             types,
                                                                                             shapes))
-        print("Evaluation result:", eval_result)
         self.__exploration_rate = max(0.01, self.__exploration_rate - self.__exploration_rate_decay)
+        print("Evaluation result:", eval_result)
+        print("Exploration rate:", self.__exploration_rate)
 
     def get_exploration_rate(self):
         return self.__exploration_rate
