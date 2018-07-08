@@ -25,8 +25,7 @@ def main():
     memory = long_term_memory.restoring_memory_object()
     if memory is None:
         memory = Memory(environment.observation_space,
-                        number_of_actions=environment.action_space.n,
-                        look_ahead_state_for_reward_estimation=10)
+                        number_of_actions=environment.action_space.n)
     exploration_rate = long_term_memory.restoring_exploration_object()
     if exploration_rate is None:
         exploration_rate = 1

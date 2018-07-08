@@ -58,7 +58,7 @@ class Memory:
             states[batch_index] = experience.state
             actions[batch_index] = experience.action
             rewards[batch_index] = experience.reward
-            next_state[batch_size] = experience.next_state
+            next_state[batch_index] = experience.next_state
             batch_index += 1
             if batch_index % batch_size == 0:
                 yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards})

@@ -6,29 +6,30 @@ import multiprocessing
 
 
 class DecisionMaker:
+    PRIMARY_SCOPE = 'decision_making'
     MAIN_NETWORK_NAME = 'main'
     PERSISTED_NETWORK_NAME = 'persisted'
 
     class PersistingPredictionKnowledgeHook(tf.train.SessionRunHook):
-        def end(self, session: tf.Session):
-            source_variables = session.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                            DecisionMaker.MAIN_NETWORK_NAME)
-            destination_variables = session.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                 DecisionMaker.PERSISTED_NETWORK_NAME)
-            print("************************************")
-            print("Source")
-            for src in source_variables:
-                print(src.name)
-            print("####################################")
-            print("Destination")
-            for src in source_variables:
-                print(src.name)
+        PERSISTING_OPERATOR_NAME = 'persisting_operator'
 
+        def begin(self):
+            self.__create_persisting_prediction_knowledge_network()
+
+        def after_create_session(self, session, coord):
+            session.run("{}".format(self.PERSISTING_OPERATOR_NAME))
+
+        def __create_persisting_prediction_knowledge_network(self):
+            pattern = '{}/{}'
+            source_scope = pattern.format(DecisionMaker.PRIMARY_SCOPE, DecisionMaker.MAIN_NETWORK_NAME)
+            destination_scope = pattern.format(DecisionMaker.PRIMARY_SCOPE, DecisionMaker.PERSISTED_NETWORK_NAME)
+            source_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, source_scope)
+            destination_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, destination_scope)
             assert len(source_variables) == len(destination_variables)
             persisting_ops = []
             for src, dst in zip(source_variables, destination_variables):
                 persisting_ops.append(dst.assign(src))
-            session.run(persisting_ops)
+            tf.group(*persisting_ops, name=self.PERSISTING_OPERATOR_NAME)
 
     def __init__(self,
                  state_space,
@@ -92,7 +93,7 @@ class DecisionMaker:
         self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(training_input_generator,
                                                                            types,
                                                                            shapes),
-                           hooks=self.PersistingPredictionKnowledgeHook())
+                           hooks=[self.PersistingPredictionKnowledgeHook()])
         eval_result = self.__model.evaluate(input_fn=lambda: tf.data.Dataset.from_generator(evaluation_input_generator,
                                                                                             types,
                                                                                             shapes))
@@ -104,12 +105,13 @@ class DecisionMaker:
         return self.__exploration_rate
 
     def _model_fn(self, features, labels, mode):
-        with tf.variable_scope("Decision_Making"):
+        with tf.variable_scope(self.PRIMARY_SCOPE):
             q_value = self.__q_value_network(features, name=self.MAIN_NETWORK_NAME)
+            max_q_value = tf.reduce_max(q_value, axis=1)
             if mode == tf.estimator.ModeKeys.PREDICT:
                 predictions = {
                     'selected_action': tf.argmax(q_value, axis=1),
-                    'estimated_q_value': tf.reduce_max(q_value, axis=1)
+                    'estimated_q_value': max_q_value
                 }
                 return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
             next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
@@ -119,7 +121,7 @@ class DecisionMaker:
                                           dtype=tf.float32)
             next_state_q_value = tf.reduce_sum(next_state_q_value * committed_action, axis=1)
             total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
-            loss = tf.losses.mean_squared_error(labels=total_reward, predictions=q_value)
+            loss = tf.losses.mean_squared_error(labels=total_reward, predictions=max_q_value)
             tf.summary.scalar('loss', loss)
             if mode == tf.estimator.ModeKeys.EVAL:
                 return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
@@ -142,7 +144,10 @@ class DecisionMaker:
                                        name="conv_{}".format(layer_index))
             net = tf.layers.flatten(inputs=net)
             for layer_index, units in enumerate(self.__fully_connected_units):
-                net = tf.layers.dense(inputs=net, units=units, activation=tf.nn.relu, name="dens_".format(layer_index))
+                net = tf.layers.dense(inputs=net,
+                                      units=units,
+                                      activation=tf.nn.relu,
+                                      name="dens_{}".format(layer_index))
             q_value = tf.layers.dense(inputs=net, units=self.__number_of_actions, activation=None, name="q_value")
             return q_value
 
