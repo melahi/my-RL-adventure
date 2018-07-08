@@ -6,12 +6,37 @@ import multiprocessing
 
 
 class DecisionMaker:
+    MAIN_NETWORK_NAME = 'main'
+    PERSISTED_NETWORK_NAME = 'persisted'
+
+    class PersistingPredictionKnowledgeHook(tf.train.SessionRunHook):
+        def end(self, session: tf.Session):
+            source_variables = session.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                            DecisionMaker.MAIN_NETWORK_NAME)
+            destination_variables = session.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                                 DecisionMaker.PERSISTED_NETWORK_NAME)
+            print("************************************")
+            print("Source")
+            for src in source_variables:
+                print(src.name)
+            print("####################################")
+            print("Destination")
+            for src in source_variables:
+                print(src.name)
+
+            assert len(source_variables) == len(destination_variables)
+            persisting_ops = []
+            for src, dst in zip(source_variables, destination_variables):
+                persisting_ops.append(dst.assign(src))
+            session.run(persisting_ops)
+
     def __init__(self,
                  state_space,
                  number_of_actions: int,
                  model_dir: str,
                  learning_rate: float=0.001,
-                 exploration_rate: float=1.0):
+                 exploration_rate: float=1.0,
+                 gamma: float=0.975):
         self._model_name = "DeepQN"
         self.__learning_rate = learning_rate
         self.__conv_filter_count = [32, 64, 64]
@@ -24,6 +49,7 @@ class DecisionMaker:
         self.__prediction_function = None
         self.__exploration_rate = exploration_rate
         self.__exploration_rate_decay = 0.001
+        self.__gamma = gamma
         model_dir = os.path.join(model_dir, "models", self._model_name)
         os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
@@ -78,7 +104,32 @@ class DecisionMaker:
 
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope("Decision_Making"):
-            net = features
+            q_value = self.__q_value_network(features, name=self.MAIN_NETWORK_NAME)
+            if mode == tf.estimator.ModeKeys.PREDICT:
+                predictions = {
+                    'selected_action': tf.argmax(q_value, axis=1),
+                    'estimated_q_value': tf.reduce_max(q_value, axis=1)
+                }
+                return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+            next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
+            next_state_q_value = tf.stop_gradient(next_state_q_value)
+            committed_action = tf.one_hot(indices=labels['committed_action'],
+                                          depth=self.__number_of_actions,
+                                          dtype=tf.float32)
+            next_state_q_value = tf.reduce_sum(next_state_q_value * committed_action, axis=1)
+            total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
+            loss = tf.losses.mean_squared_error(labels=total_reward, predictions=q_value)
+            tf.summary.scalar('loss', loss)
+            if mode == tf.estimator.ModeKeys.EVAL:
+                return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
+
+            optimizer = tf.train.AdamOptimizer(learning_rate=self.__learning_rate)
+            train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
+            return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+
+    def __q_value_network(self, state, name: str):
+        with tf.variable_scope(name):
+            net = state
             for layer_index, (filter_count, filter_size, stride) in enumerate(zip(self.__conv_filter_count,
                                                                                   self.__conv_filter_size,
                                                                                   self.__conv_stride)):
@@ -90,32 +141,9 @@ class DecisionMaker:
                                        name="conv_{}".format(layer_index))
             net = tf.layers.flatten(inputs=net)
             for layer_index, units in enumerate(self.__fully_connected_units):
-                net = tf.layers.dense(inputs=net,
-                                      units=units,
-                                      activation=tf.nn.relu,
-                                      name="dens_".format(layer_index))
-            output = tf.layers.dense(inputs=net,
-                                     units=self.__number_of_actions,
-                                     activation=None,
-                                     name="output")
-            if mode == tf.estimator.ModeKeys.PREDICT:
-                predictions = {
-                    'selected_action': tf.argmax(output, axis=1),
-                    'estimated_q_value': tf.reduce_max(output, axis=1)
-                }
-                return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-            committed_action = tf.one_hot(indices=labels['committed_action'],
-                                          depth=self.__number_of_actions,
-                                          dtype=tf.float32)
-            output = tf.multiply(output, committed_action)
-            loss = tf.losses.mean_squared_error(labels=labels['q_value'], predictions=output)
-            tf.summary.scalar('loss', loss)
-            if mode == tf.estimator.ModeKeys.EVAL:
-                return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
-
-            optimizer = tf.train.AdamOptimizer(learning_rate=self.__learning_rate)
-            train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
-            return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+                net = tf.layers.dense(inputs=net, units=units, activation=tf.nn.relu, name="dens_".format(layer_index))
+            q_value = tf.layers.dense(inputs=net, units=self.__number_of_actions, activation=None, name="q_value")
+            return q_value
 
     def __input_generator_for_prediction(self):
         while True:
@@ -130,8 +158,9 @@ class DecisionMaker:
         return features_type, features_shape
 
     def __get_labels_structure(self):
-        labels_type = {'q_value': tf.float32, 'committed_action': tf.uint8}
-        labels_shape = {'q_value': tf.TensorShape([None, self.__number_of_actions]),
+        labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8}
+        labels_shape = {'next_state': tf.TensorShape([None, *self.__state_space.shape]),
+                        'reward': tf.TensorShape([None]),
                         'committed_action': tf.TensorShape([None])}
         return labels_type, labels_shape
 
