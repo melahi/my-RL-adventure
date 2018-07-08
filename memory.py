@@ -10,11 +10,7 @@ class Memory:
                  needed_observation_for_state=1,
                  training_capacity=1000000,
                  validation_capacity=None,
-                 look_ahead_state_for_reward_estimation=10,
-                 sampling_probability=0.5,
-                 gamma=0.95):
-        assert look_ahead_state_for_reward_estimation > 0, "look_ahead_state_for_reward_estimation should be greater" \
-                                                           "than zero."
+                 sampling_probability=0.5):
         assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
                                                                           "satisfy our assumptions"
         self.__last_state = np.zeros(shape=[*observation_space.shape, needed_observation_for_state])
@@ -24,39 +20,25 @@ class Memory:
             validation_capacity = int(training_capacity / 3)
         self.__validation_experiences = collections.deque(maxlen=validation_capacity)
         self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
-        self.__look_ahead_state_for_reward_estimation = look_ahead_state_for_reward_estimation
         self.__sampling_probability = sampling_probability
-        self.__gamma = gamma
-        self.__uncompleted_experiences = list()
 
-    def reset(self):
-        self.__last_state = np.zeros(shape=self.__last_state.shape)
-        self.__uncompleted_experiences = list()
-
-    def get_state(self, observation):
+    def get_state(self, observation, first_observation=False):
         """Completing current state based on new observation."""
+        if first_observation:
+            for index in range(self.__last_state.shape[2]):
+                self.__last_state[:, :, index] = observation
+            return self.__last_state
         self.__last_state[:, :, :-1] = self.__last_state[:, :, 1:]
         self.__last_state[:, :, -1] = observation
-        return self.__last_state
+        return self.__last_state.copy()
 
-    def save_state(self, state, reward, action):
+    def save_state(self, state, reward, action, next_state):
         if random.random() < self.__sampling_probability:
-            self.__uncompleted_experiences.append(Experience(state,
-                                                             action,
-                                                             self.__look_ahead_state_for_reward_estimation,
-                                                             self.__gamma))
-        new_uncompleted_experience_list = list()
-        for experience in self.__uncompleted_experiences:
-            if not experience.add_reward(reward):
-                # It means that this experience still needs to know rewards of future states.
-                new_uncompleted_experience_list.append(experience)
+            experience = Experience(state, action, reward, next_state)
+            if random.random() < self.__validation_sampling_rate:
+                self.__validation_experiences.append(experience)
             else:
-                if random.random() < self.__validation_sampling_rate:
-                    self.__validation_experiences.append(experience)
-                else:
-                    self.__training_experiences.append(experience)
-
-        self.__uncompleted_experiences = new_uncompleted_experience_list
+                self.__training_experiences.append(experience)
 
     def remember_training_experiences(self, batch_size=128):
         random.shuffle(self.__training_experiences)
@@ -69,22 +51,27 @@ class Memory:
         states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
         actions = np.zeros([batch_size], dtype=np.uint8)
-        rewards = np.zeros([batch_size, self.__number_of_actions])
+        rewards = np.zeros([batch_size])
+        next_state = np.zeros(states_shape)
         batch_index = 0
         for experience in memorized_experiences:
             states[batch_index] = experience.state
             actions[batch_index] = experience.action
-            rewards[batch_index, actions[batch_index]] = experience.reward
+            rewards[batch_index] = experience.reward
+            next_state[batch_size] = experience.next_state
             batch_index += 1
             if batch_index % batch_size == 0:
-                yield (states, {'committed_action': actions, 'q_value': rewards})
+                yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards})
                 # creating another batch
                 batch_index = 0
                 states = np.zeros(states_shape)
                 actions = np.zeros([batch_size], dtype=np.uint8)
-                rewards = np.zeros([batch_size, self.__number_of_actions])
+                rewards = np.zeros([batch_size])
+                next_state = np.zeros(states_shape)
         if batch_index != 0:
-            yield (states[:batch_index], {'committed_action': actions[:batch_index], 'q_value': rewards[:batch_index]})
+            yield (states[:batch_index], {'next_state': next_state[:batch_index],
+                                          'committed_action': actions[:batch_index],
+                                          'reward': rewards[:batch_index]})
 
     @staticmethod
     def __check_environment_assumptions(observation_space):
@@ -98,27 +85,8 @@ class Memory:
 
 
 class Experience:
-    def __init__(self, state, action, look_ahead_state_for_reward_estimation, gamma):
+    def __init__(self, state, action, reward, next_state):
         self.state = state
         self.action = action
-        self.reward = 0
-        self.__gamma = gamma
-        self.__gamma_coefficient = 1
-        self.__need_to_know_reward_counter = look_ahead_state_for_reward_estimation
-        assert look_ahead_state_for_reward_estimation > 0, "look_ahead_state_for_reward_estimation should be greater" \
-                                                           "than zero."
-
-    def add_reward(self, reward):
-        """
-        Adding reward of next future state to this experience.
-        Returns if all rewards of needed look ahead states are added or not.
-
-        :param reward: The reward of next future state
-        :return: `True` if all need reward was added, `False` otherwise.
-        """
-        self.reward += self.__gamma_coefficient * reward
-        self.__gamma_coefficient *= self.__gamma
-        self.__need_to_know_reward_counter -= 1
-        if self.__need_to_know_reward_counter == 0:
-            return True
-        return False
+        self.reward = reward
+        self.next_state = next_state

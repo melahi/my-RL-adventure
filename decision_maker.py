@@ -91,7 +91,8 @@ class DecisionMaker:
         shapes = (features_shape, labels_shape)
         self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(training_input_generator,
                                                                            types,
-                                                                           shapes))
+                                                                           shapes),
+                           hooks=self.PersistingPredictionKnowledgeHook())
         eval_result = self.__model.evaluate(input_fn=lambda: tf.data.Dataset.from_generator(evaluation_input_generator,
                                                                                             types,
                                                                                             shapes))
@@ -170,9 +171,6 @@ class DecisionMaker:
         self.__decision_process_started = True
         self.__provided_input = multiprocessing.Semaphore(0)
         features_type, features_shape = self.__get_features_structure()
-        input_generator = tf.data.Dataset.from_generator(self.__input_generator_for_prediction,
-                                                         features_type,
-                                                         features_shape)
         self.__prediction_function = self.__model.predict(input_fn=lambda: tf.data.Dataset.from_generator(
             self.__input_generator_for_prediction, features_type, features_shape))
 
