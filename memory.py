@@ -85,8 +85,8 @@ class Memory:
 
 
 class Experience:
-    def __init__(self, state, action, reward, next_state):
-        self.state = state
+    def __init__(self, state: np.ndarray, action: int, reward: float, next_state: np.ndarray):
+        self.state = state.copy()
         self.action = action
         self.reward = reward
-        self.next_state = next_state
+        self.next_state = next_state.copy()

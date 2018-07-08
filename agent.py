@@ -12,6 +12,7 @@ class Agent:
         self.__decision_maker = decision_maker
         self.__memory = memory
         self.__training_frequency = 50
+        self.__start_to_training = 1000
         self.finalizing_episode(0)
         signal.signal(signal.SIGINT, self.terminate)
 
@@ -19,20 +20,22 @@ class Agent:
         self.__playing = True
         episode_counter = 1
         while self.__playing:
-            self.__memory.reset()
             observation = self.__env.reset()
-            state = self.__memory.get_state(observation)
+            state = self.__memory.get_state(observation, first_observation=True)
             episode_finished = False
             while not episode_finished:
                 action_id = self.__decision_maker.making_decision(state)
                 self.__env.action(action_id)
                 observation, reward, episode_finished = self.__env.perception()
-                self.__memory.save_state(state, reward, action_id)
-                state = self.__memory.get_state(observation)
+                next_state = self.__memory.get_state(observation)
+                self.__memory.save_state(state, reward, action_id, next_state)
+                state = next_state
             self.finalizing_episode(episode_counter)
             episode_counter += 1
 
     def finalizing_episode(self, episode_counter):
+        if episode_counter < self.__start_to_training:
+            return
         if episode_counter % self.__training_frequency == 0:
             print("Start training in episode:", episode_counter)
             self.__decision_maker.train(self.__memory.remember_training_experiences,
