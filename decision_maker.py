@@ -49,7 +49,7 @@ class DecisionMaker:
         self.__decision_process_started = False
         self.__prediction_function = None
         self.__exploration_rate = exploration_rate
-        self.__exploration_rate_decay = 0.001
+        self.__exploration_rate_decay = 0.005
         self.__gamma = gamma
         model_dir = os.path.join(model_dir, "models", self._model_name)
         os.makedirs(model_dir, exist_ok=True)
@@ -107,21 +107,21 @@ class DecisionMaker:
     def _model_fn(self, features, labels, mode):
         with tf.variable_scope(self.PRIMARY_SCOPE):
             q_value = self.__q_value_network(features, name=self.MAIN_NETWORK_NAME)
-            max_q_value = tf.reduce_max(q_value, axis=1)
             if mode == tf.estimator.ModeKeys.PREDICT:
                 predictions = {
                     'selected_action': tf.argmax(q_value, axis=1),
-                    'estimated_q_value': max_q_value
+                    'estimated_q_value': tf.reduce_max(q_value, axis=1)
                 }
                 return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
             next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
             next_state_q_value = tf.stop_gradient(next_state_q_value)
+            total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
             committed_action = tf.one_hot(indices=labels['committed_action'],
                                           depth=self.__number_of_actions,
                                           dtype=tf.float32)
-            next_state_q_value = tf.reduce_sum(next_state_q_value * committed_action, axis=1)
-            total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
-            loss = tf.losses.mean_squared_error(labels=total_reward, predictions=max_q_value)
+            q_value = committed_action * q_value
+            total_reward = committed_action * total_reward
+            loss = tf.losses.mean_squared_error(labels=total_reward, predictions=q_value)
             tf.summary.scalar('loss', loss)
             if mode == tf.estimator.ModeKeys.EVAL:
                 return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
