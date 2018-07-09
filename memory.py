@@ -51,13 +51,13 @@ class Memory:
         states_shape = [batch_size, *self.__last_state.shape]
         states = np.zeros(states_shape)
         actions = np.zeros([batch_size], dtype=np.uint8)
-        rewards = np.zeros([batch_size])
+        rewards = np.zeros([batch_size, self.__number_of_actions])
         next_state = np.zeros(states_shape)
         batch_index = 0
         for experience in memorized_experiences:
             states[batch_index] = experience.state
             actions[batch_index] = experience.action
-            rewards[batch_index] = experience.reward
+            rewards[batch_index, experience.action] = experience.reward
             next_state[batch_index] = experience.next_state
             batch_index += 1
             if batch_index % batch_size == 0:
@@ -66,7 +66,7 @@ class Memory:
                 batch_index = 0
                 states = np.zeros(states_shape)
                 actions = np.zeros([batch_size], dtype=np.uint8)
-                rewards = np.zeros([batch_size])
+                rewards = np.zeros([batch_size, self.__number_of_actions])
                 next_state = np.zeros(states_shape)
         if batch_index != 0:
             yield (states[:batch_index], {'next_state': next_state[:batch_index],

@@ -166,7 +166,7 @@ class DecisionMaker:
     def __get_labels_structure(self):
         labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8}
         labels_shape = {'next_state': tf.TensorShape([None, *self.__state_space.shape]),
-                        'reward': tf.TensorShape([None]),
+                        'reward': tf.TensorShape([None, self.__number_of_actions]),
                         'committed_action': tf.TensorShape([None])}
         return labels_type, labels_shape
 
