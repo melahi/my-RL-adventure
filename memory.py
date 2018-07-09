@@ -8,7 +8,7 @@ class Memory:
                  observation_space,
                  number_of_actions,
                  needed_observation_for_state=1,
-                 training_capacity=1000000,
+                 training_capacity=10000,
                  validation_capacity=None,
                  sampling_probability=0.5):
         assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
@@ -42,36 +42,38 @@ class Memory:
 
     def remember_training_experiences(self, batch_size=128):
         random.shuffle(self.__training_experiences)
-        return self.__remember_experiences(self.__training_experiences, batch_size)
+        print("Training experiences:", len(self.__training_experiences))
+        return self.__remember_experiences(self.__training_experiences, batch_size, 5)
 
     def remember_evaluation_experiences(self, batch_size=128):
         return self.__remember_experiences(self.__validation_experiences, batch_size)
 
-    def __remember_experiences(self, memorized_experiences, batch_size):
+    def __remember_experiences(self, memorized_experiences, batch_size, repetition=1):
         states_shape = [batch_size, *self.__last_state.shape]
-        states = np.zeros(states_shape)
-        actions = np.zeros([batch_size], dtype=np.uint8)
-        rewards = np.zeros([batch_size, self.__number_of_actions])
-        next_state = np.zeros(states_shape)
-        batch_index = 0
-        for experience in memorized_experiences:
-            states[batch_index] = experience.state
-            actions[batch_index] = experience.action
-            rewards[batch_index, experience.action] = experience.reward
-            next_state[batch_index] = experience.next_state
-            batch_index += 1
-            if batch_index % batch_size == 0:
-                yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards})
-                # creating another batch
-                batch_index = 0
-                states = np.zeros(states_shape)
-                actions = np.zeros([batch_size], dtype=np.uint8)
-                rewards = np.zeros([batch_size, self.__number_of_actions])
-                next_state = np.zeros(states_shape)
-        if batch_index != 0:
-            yield (states[:batch_index], {'next_state': next_state[:batch_index],
-                                          'committed_action': actions[:batch_index],
-                                          'reward': rewards[:batch_index]})
+        for _ in range(repetition):
+            states = np.zeros(states_shape)
+            actions = np.zeros([batch_size], dtype=np.uint8)
+            rewards = np.zeros([batch_size, self.__number_of_actions])
+            next_state = np.zeros(states_shape)
+            batch_index = 0
+            for experience in memorized_experiences:
+                states[batch_index] = experience.state
+                actions[batch_index] = experience.action
+                rewards[batch_index, experience.action] = experience.reward
+                next_state[batch_index] = experience.next_state
+                batch_index += 1
+                if batch_index % batch_size == 0:
+                    yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards})
+                    # creating another batch
+                    batch_index = 0
+                    states = np.zeros(states_shape)
+                    actions = np.zeros([batch_size], dtype=np.uint8)
+                    rewards = np.zeros([batch_size, self.__number_of_actions])
+                    next_state = np.zeros(states_shape)
+            if batch_index != 0:
+                yield (states[:batch_index], {'next_state': next_state[:batch_index],
+                                              'committed_action': actions[:batch_index],
+                                              'reward': rewards[:batch_index]})
 
     @staticmethod
     def __check_environment_assumptions(observation_space):
