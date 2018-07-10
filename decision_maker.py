@@ -134,7 +134,7 @@ class DecisionMaker:
 
     def __q_value_network(self, state, name: str):
         with tf.variable_scope(name):
-            net = state
+            net = (state - 128) / 256  # Normalizing input
             for layer_index, (filter_count, filter_size, stride) in enumerate(zip(self.__conv_filter_count,
                                                                                   self.__conv_filter_size,
                                                                                   self.__conv_stride)):
