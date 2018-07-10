@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 import multiprocessing
 
+from env.atari_wrappers import LazyFrames
+
 
 class DecisionMaker:
     PRIMARY_SCOPE = 'decision_making'
@@ -55,7 +57,7 @@ class DecisionMaker:
         os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
                                               model_dir=model_dir)
-        # When a decision for a state is needed to be taken, the state will be stored in the `__needed_to_predict`
+        # When a decision for a state is needed to be taken, the state will be stored in the `__need_to_predict`
         # variable and then used in the `input_generation_for_prediction` function to provide the input for the model,
         # then the model will make the decision.
         self.__need_to_predict = None
@@ -64,7 +66,7 @@ class DecisionMaker:
     def __del__(self):
         self.__terminate_decision_process()
 
-    def making_decision(self, state: np.ndarray=None):
+    def making_decision(self, state: LazyFrames=None):
         """
         Making decision about which action should be performed in the given `state`.
         If `state` be None, it means that decision procedure should be over.
@@ -80,7 +82,7 @@ class DecisionMaker:
 
         if not self.__decision_process_started:
             self.__start_decision_process()
-        self.__need_to_predict = np.array([state])
+        self.__need_to_predict = [state]
         self.__provided_input.release()
         return next(self.__prediction_function)['selected_action']
 

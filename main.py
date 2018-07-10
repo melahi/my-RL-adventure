@@ -29,12 +29,7 @@ def main():
     exploration_rate = long_term_memory.restoring_exploration_object()
     if exploration_rate is None:
         exploration_rate = 1
-    needed_frame_for_state = 1
-    state_space = gym.spaces.Box(low=environment.observation_space.low.min(),
-                                 high=environment.observation_space.high.max(),
-                                 shape=[*environment.observation_space.shape, needed_frame_for_state],
-                                 dtype=environment.observation_space.dtype)
-    decision_maker = DecisionMaker(state_space=state_space,
+    decision_maker = DecisionMaker(state_space=environment.observation_space,
                                    number_of_actions=environment.action_space.n,
                                    model_dir=directory,
                                    exploration_rate=exploration_rate)

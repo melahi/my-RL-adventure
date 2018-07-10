@@ -21,15 +21,13 @@ class Agent:
         episode_counter = 1
         while self.__playing:
             observation = self.__env.reset()
-            state = self.__memory.get_state(observation, first_observation=True)
             episode_finished = False
             while not episode_finished:
-                action_id = self.__decision_maker.making_decision(state)
+                action_id = self.__decision_maker.making_decision(observation)
                 self.__env.action(action_id)
-                observation, reward, episode_finished = self.__env.perception()
-                next_state = self.__memory.get_state(observation)
-                self.__memory.save_state(state, reward, action_id, next_state)
-                state = next_state
+                new_observation, reward, episode_finished = self.__env.perception()
+                self.__memory.save_state(observation, reward, action_id, new_observation)
+                observation = new_observation
             self.finalizing_episode(episode_counter)
             episode_counter += 1
 
