@@ -12,7 +12,7 @@ class Agent:
         self.__decision_maker = decision_maker
         self.__memory = memory
         self.__training_frequency = 50
-        self.__start_to_training = 1000
+        self.__start_to_training = 10000
         self.finalizing_episode(0)
         signal.signal(signal.SIGINT, self.terminate)
 

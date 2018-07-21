@@ -34,5 +34,5 @@ class Environment:
         self.__env = make_atari(game + "NoFrameskip-v4")
         if monitor_path:
             monitor_path = os.path.join(monitor_path, "monitor")
-            self.__env = gym.wrappers.Monitor(self.__env, directory=monitor_path, resume=True)
+            self.__env = gym.wrappers.Monitor(self.__env, directory=monitor_path, force=True)
         self.__env = wrap_deepmind(self.__env, episode_life=True, clip_rewards=False, frame_stack=True, scale=False)

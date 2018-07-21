@@ -1,6 +1,5 @@
 import os
 import random
-import numpy as np
 import tensorflow as tf
 import multiprocessing
 
@@ -37,9 +36,10 @@ class DecisionMaker:
                  state_space,
                  number_of_actions: int,
                  model_dir: str,
-                 learning_rate: float=0.001,
+                 learning_rate: float=0.00025,
                  exploration_rate: float=1.0,
-                 gamma: float=0.975):
+                 gamma: float=0.975,
+                 training_steps=500):
         self._model_name = "DeepQN"
         self.__learning_rate = learning_rate
         self.__conv_filter_count = [32, 64, 64]
@@ -53,6 +53,7 @@ class DecisionMaker:
         self.__exploration_rate = exploration_rate
         self.__exploration_rate_decay = 0.005
         self.__gamma = gamma
+        self.__training_steps = training_steps
         model_dir = os.path.join(model_dir, "models", self._model_name)
         os.makedirs(model_dir, exist_ok=True)
         self.__model = tf.estimator.Estimator(model_fn=self._model_fn,
@@ -95,7 +96,8 @@ class DecisionMaker:
         self.__model.train(input_fn=lambda: tf.data.Dataset.from_generator(training_input_generator,
                                                                            types,
                                                                            shapes),
-                           hooks=[self.PersistingPredictionKnowledgeHook()])
+                           hooks=[self.PersistingPredictionKnowledgeHook()],
+                           steps=self.__training_steps)
         eval_result = self.__model.evaluate(input_fn=lambda: tf.data.Dataset.from_generator(evaluation_input_generator,
                                                                                             types,
                                                                                             shapes))
