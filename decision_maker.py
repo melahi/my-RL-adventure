@@ -152,6 +152,7 @@ class DecisionMaker:
                                       units=units,
                                       activation=tf.nn.relu,
                                       name="dens_{}".format(layer_index))
+            tf.summary.histogram("LastLayer_" + name, net)
             q_value = tf.layers.dense(inputs=net, units=self.__number_of_actions, activation=None, name="q_value")
             return q_value
 

@@ -11,7 +11,7 @@ class Agent:
         self.__playing = False
         self.__decision_maker = decision_maker
         self.__memory = memory
-        self.__training_frequency = 50
+        self.__training_frequency = 500
         self.__start_to_training = 10000
         self.finalizing_episode(0)
         signal.signal(signal.SIGINT, self.terminate)
@@ -32,6 +32,8 @@ class Agent:
             episode_counter += 1
 
     def finalizing_episode(self, episode_counter):
+        if episode_counter % 100 == 0:
+            print("Finishing episode: {}".format(episode_counter))
         if episode_counter < self.__start_to_training:
             return
         if episode_counter % self.__training_frequency == 0:
