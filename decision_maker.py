@@ -51,7 +51,7 @@ class DecisionMaker:
         self.__decision_process_started = False
         self.__prediction_function = None
         self.__exploration_rate = exploration_rate
-        self.__exploration_rate_decay = 0.005
+        self.__exploration_rate_decay = 0.0001
         self.__gamma = gamma
         self.__training_steps = training_steps
         model_dir = os.path.join(model_dir, "models", self._model_name)
@@ -67,18 +67,19 @@ class DecisionMaker:
     def __del__(self):
         self.__terminate_decision_process()
 
-    def making_decision(self, state: LazyFrames=None):
+    def making_decision(self, state: LazyFrames=None, is_validation=False):
         """
         Making decision about which action should be performed in the given `state`.
         If `state` be None, it means that decision procedure should be over.
 
         :param state: The state which the decision should be take for it.
+        :param is_validation: should decision be made for validation or not
         :return: The action which should be perform in the given state.
         """
         if state is None:
             self.__terminate_decision_process()
             return
-        if random.random() < self.__exploration_rate:
+        if not is_validation and random.random() < self.__exploration_rate:
             return random.randrange(self.__number_of_actions)
 
         if not self.__decision_process_started:
@@ -145,13 +146,13 @@ class DecisionMaker:
                                        kernel_size=filter_size,
                                        strides=stride,
                                        padding='valid',
-                                       activation=tf.nn.softplus,
+                                       activation=tf.nn.relu,
                                        name="conv_{}".format(layer_index))
             net = tf.layers.flatten(inputs=net)
             for layer_index, units in enumerate(self.__fully_connected_units):
                 net = tf.layers.dense(inputs=net,
                                       units=units,
-                                      activation=tf.nn.softplus,
+                                      activation=tf.nn.relu,
                                       name="dens_{}".format(layer_index))
             tf.summary.histogram("LastLayer_" + name, net)
             q_value = tf.layers.dense(inputs=net, units=self.__number_of_actions, activation=None, name="q_value")

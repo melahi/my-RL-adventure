@@ -10,8 +10,8 @@ class Environment:
     environments.
     """
     def __init__(self, game: str, monitor_path: str=None):
+        self.validation_episode = False
         self.__create_environment(monitor_path, game)
-
         self.observation_space = self.__env.observation_space
         self.action_space = self.__env.action_space
         self.__last_observation = None
@@ -34,5 +34,13 @@ class Environment:
         self.__env = make_atari(game + "NoFrameskip-v4")
         if monitor_path:
             monitor_path = os.path.join(monitor_path, "monitor")
-            self.__env = gym.wrappers.Monitor(self.__env, directory=monitor_path, force=True)
+            self.__env = gym.wrappers.Monitor(self.__env,
+                                              directory=monitor_path,
+                                              force=True,
+                                              video_callable=self.__is_validation)
         self.__env = wrap_deepmind(self.__env, episode_life=True, clip_rewards=False, frame_stack=True, scale=False)
+
+    # noinspection PyUnusedLocal
+    def __is_validation(self, episode_index):
+        return self.validation_episode
+

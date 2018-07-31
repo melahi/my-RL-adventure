@@ -22,16 +22,21 @@ class Agent:
         while self.__playing:
             observation = self.__env.reset()
             episode_finished = False
+            total_reward = 0
             while not episode_finished:
-                action_id = self.__decision_maker.making_decision(observation)
+                action_id = self.__decision_maker.making_decision(observation, self.__env.validation_episode)
                 self.__env.action(action_id)
                 new_observation, reward, episode_finished = self.__env.perception()
+                total_reward += reward
                 self.__memory.save_state(observation, reward, action_id, new_observation, episode_finished)
                 observation = new_observation
+            if self.__env.validation_episode:
+                print("Validation total reward:", total_reward)
             self.finalizing_episode(episode_counter)
             episode_counter += 1
 
     def finalizing_episode(self, episode_counter):
+        self.__env.validation_episode = False
         if episode_counter % 100 == 0:
             print("Finishing episode: {}".format(episode_counter))
         if episode_counter < self.__start_to_training:
@@ -40,6 +45,8 @@ class Agent:
             print("Start training in episode:", episode_counter)
             self.__decision_maker.train(self.__memory.remember_training_experiences,
                                         self.__memory.remember_evaluation_experiences)
+        if episode_counter % self.__training_frequency < 20:
+            self.__env.validation_episode = True
 
     def terminate(self, signum=signal.SIGINT, frame=None):
         print("Terminating gracefully ...")
