@@ -36,7 +36,7 @@ class DecisionMaker:
                  state_space,
                  number_of_actions: int,
                  model_dir: str,
-                 learning_rate: float=0.00025,
+                 learning_rate: float=0.000025,
                  exploration_rate: float=1.0,
                  gamma: float=0.975,
                  training_steps=500):
@@ -145,12 +145,13 @@ class DecisionMaker:
                                        kernel_size=filter_size,
                                        strides=stride,
                                        padding='valid',
+                                       activation=tf.nn.softplus,
                                        name="conv_{}".format(layer_index))
             net = tf.layers.flatten(inputs=net)
             for layer_index, units in enumerate(self.__fully_connected_units):
                 net = tf.layers.dense(inputs=net,
                                       units=units,
-                                      activation=tf.nn.relu,
+                                      activation=tf.nn.softplus,
                                       name="dens_{}".format(layer_index))
             tf.summary.histogram("LastLayer_" + name, net)
             q_value = tf.layers.dense(inputs=net, units=self.__number_of_actions, activation=None, name="q_value")
