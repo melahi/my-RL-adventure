@@ -117,14 +117,14 @@ class DecisionMaker:
                     'estimated_q_value': tf.reduce_max(q_value, axis=1)
                 }
                 return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-            next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
-            next_state_q_value = tf.stop_gradient(next_state_q_value)
-            total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
             committed_action = tf.one_hot(indices=labels['committed_action'],
                                           depth=self.__number_of_actions,
                                           dtype=tf.float32)
-            q_value = committed_action * q_value
-            total_reward = committed_action * total_reward
+            q_value = tf.reduce_sum(committed_action * q_value, axis=1)
+            next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
+            next_state_q_value = tf.reduce_max(next_state_q_value, axis=1) * labels['done']
+            total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
+            total_reward = tf.stop_gradient(total_reward)
             loss = tf.losses.mean_squared_error(labels=total_reward, predictions=q_value)
             tf.summary.scalar('loss', loss)
             if mode == tf.estimator.ModeKeys.EVAL:
@@ -169,10 +169,11 @@ class DecisionMaker:
         return features_type, features_shape
 
     def __get_labels_structure(self):
-        labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8}
+        labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8, 'done': tf.float32}
         labels_shape = {'next_state': tf.TensorShape([None, *self.__state_space.shape]),
-                        'reward': tf.TensorShape([None, self.__number_of_actions]),
-                        'committed_action': tf.TensorShape([None])}
+                        'reward': tf.TensorShape([None]),
+                        'committed_action': tf.TensorShape([None]),
+                        'done': tf.TensorShape([None])}
         return labels_type, labels_shape
 
     def __start_decision_process(self):

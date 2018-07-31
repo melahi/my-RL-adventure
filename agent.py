@@ -12,7 +12,7 @@ class Agent:
         self.__decision_maker = decision_maker
         self.__memory = memory
         self.__training_frequency = 500
-        self.__start_to_training = 10000
+        self.__start_to_training = 5000
         self.finalizing_episode(0)
         signal.signal(signal.SIGINT, self.terminate)
 
@@ -26,7 +26,7 @@ class Agent:
                 action_id = self.__decision_maker.making_decision(observation)
                 self.__env.action(action_id)
                 new_observation, reward, episode_finished = self.__env.perception()
-                self.__memory.save_state(observation, reward, action_id, new_observation)
+                self.__memory.save_state(observation, reward, action_id, new_observation, episode_finished)
                 observation = new_observation
             self.finalizing_episode(episode_counter)
             episode_counter += 1
