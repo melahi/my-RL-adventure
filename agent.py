@@ -12,9 +12,12 @@ class Agent:
         self.__decision_maker = decision_maker
         self.__memory = memory
         self.__training_frequency = 500
-        self.__start_to_training = 5000
+        self.__start_to_training = 10000
         self.finalizing_episode(0)
         signal.signal(signal.SIGINT, self.terminate)
+        # Creating model
+        self.__decision_maker.train(self.__memory.remember_training_experiences,
+                                    self.__memory.remember_evaluation_experiences)
 
     def play(self):
         self.__playing = True
@@ -41,10 +44,17 @@ class Agent:
             print("Finishing episode: {}".format(episode_counter))
         if episode_counter < self.__start_to_training:
             return
+        elif episode_counter == self.__start_to_training:
+            print("State value of tracking states:")
+            for i, state in enumerate(self.__memory.tracking_state):
+                print(i, ":", self.__decision_maker.get_state_value(state))
         if episode_counter % self.__training_frequency == 0:
             print("Start training in episode:", episode_counter)
             self.__decision_maker.train(self.__memory.remember_training_experiences,
                                         self.__memory.remember_evaluation_experiences)
+            print("State value of tracking states:")
+            for i, state in enumerate(self.__memory.tracking_state):
+                print(i, ":", self.__decision_maker.get_state_value(state))
         if episode_counter % self.__training_frequency < 20:
             self.__env.validation_episode = True
 

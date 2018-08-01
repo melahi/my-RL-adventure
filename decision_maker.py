@@ -36,10 +36,10 @@ class DecisionMaker:
                  state_space,
                  number_of_actions: int,
                  model_dir: str,
-                 learning_rate: float=0.000025,
+                 learning_rate: float=0.00025,
                  exploration_rate: float=1.0,
-                 gamma: float=0.975,
-                 training_steps=500):
+                 gamma: float=0.99,
+                 training_steps=None):
         self._model_name = "DeepQN"
         self.__learning_rate = learning_rate
         self.__conv_filter_count = [32, 64, 64]
@@ -87,6 +87,17 @@ class DecisionMaker:
         self.__need_to_predict = [state]
         self.__provided_input.release()
         return next(self.__prediction_function)['selected_action']
+
+    def get_state_value(self, state: LazyFrames=None):
+        if state is None:
+            self.__terminate_decision_process()
+            return
+
+        if not self.__decision_process_started:
+            self.__start_decision_process()
+        self.__need_to_predict = [state]
+        self.__provided_input.release()
+        return next(self.__prediction_function)['estimated_q_value']
 
     def train(self, training_input_generator, evaluation_input_generator):
         self.__terminate_decision_process()

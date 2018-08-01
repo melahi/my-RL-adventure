@@ -11,7 +11,7 @@ class Memory:
                  number_of_actions,
                  training_capacity=100000,
                  validation_capacity=None,
-                 sampling_probability=1):
+                 sampling_probability=0.01):
         assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
                                                                           "satisfy our assumptions"
         self.__state_shape = observation_space.shape
@@ -22,14 +22,24 @@ class Memory:
         self.__validation_experiences = collections.deque(maxlen=validation_capacity)
         self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
         self.__sampling_probability = sampling_probability
+        self.__short_term_memory = collections.deque(maxlen=20)
+        self.tracking_state = list()
 
     def save_state(self, state, reward, action, next_state, done):
-        if random.random() < self.__sampling_probability:
-            experience = Experience(state, action, reward, next_state, done)
+        experience = Experience(state, action, reward, next_state, done)
+        self.__short_term_memory.append(experience)
+        if reward > 0 or (done and random.random() < self.__sampling_probability):
+            if len(self.tracking_state) == 0 and reward > 0:
+                for exp in self.__short_term_memory:
+                    self.tracking_state.append(exp.state)
             if random.random() < self.__validation_sampling_rate:
-                self.__validation_experiences.append(experience)
+                while len(self.__short_term_memory) > 0:
+                    self.__validation_experiences.append(self.__short_term_memory.pop())
             else:
-                self.__training_experiences.append(experience)
+                while len(self.__short_term_memory) > 0:
+                    self.__training_experiences.append(self.__short_term_memory.pop())
+        elif done:
+            self.__short_term_memory.clear()
 
     def remember_training_experiences(self, batch_size=128):
         random.shuffle(self.__training_experiences)
