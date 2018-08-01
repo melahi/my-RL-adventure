@@ -25,6 +25,9 @@ class Memory:
         self.__short_term_memory = collections.deque(maxlen=20)
         self.tracking_state = list()
 
+    def __len__(self):
+        return len(self.__training_experiences)
+
     def save_state(self, state, reward, action, next_state, done):
         experience = Experience(state, action, reward, next_state, done)
         self.__short_term_memory.append(experience)
@@ -41,11 +44,11 @@ class Memory:
         elif done:
             self.__short_term_memory.clear()
 
-    def remember_training_experiences(self, batch_size=128):
+    def remember_training_experiences(self, batch_size=32):
         random.shuffle(self.__training_experiences)
         return self.__remember_experiences(self.__training_experiences, batch_size)
 
-    def remember_evaluation_experiences(self, batch_size=128):
+    def remember_evaluation_experiences(self, batch_size=32):
         return self.__remember_experiences(self.__validation_experiences, batch_size)
 
     def __remember_experiences(self, memorized_experiences, batch_size):
