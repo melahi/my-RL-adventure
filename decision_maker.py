@@ -51,7 +51,7 @@ class DecisionMaker:
         self.__decision_process_started = False
         self.__prediction_function = None
         self.__exploration_rate = exploration_rate
-        self.__exploration_rate_decay = 0.0001
+        self.__exploration_rate_decay = 0.001
         self.__gamma = gamma
         self.__training_steps = training_steps
         model_dir = os.path.join(model_dir, "models", self._model_name)
@@ -134,7 +134,7 @@ class DecisionMaker:
                                           dtype=tf.float32)
             q_value = tf.reduce_sum(committed_action * q_value, axis=1)
             next_state_q_value = self.__q_value_network(labels['next_state'], name=self.PERSISTED_NETWORK_NAME)
-            next_state_q_value = tf.reduce_max(next_state_q_value, axis=1) * labels['done']
+            next_state_q_value = tf.reduce_max(next_state_q_value, axis=1) * labels['continuing']
             total_reward = labels['reward'] + (self.__gamma * next_state_q_value)
             total_reward = tf.stop_gradient(total_reward)
             loss = tf.losses.mean_squared_error(labels=total_reward, predictions=q_value)
@@ -182,11 +182,11 @@ class DecisionMaker:
         return features_type, features_shape
 
     def __get_labels_structure(self):
-        labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8, 'done': tf.float32}
+        labels_type = {'next_state': tf.float32, 'reward': tf.float32, 'committed_action': tf.uint8, 'continuing': tf.float32}
         labels_shape = {'next_state': tf.TensorShape([None, *self.__state_space.shape]),
                         'reward': tf.TensorShape([None]),
                         'committed_action': tf.TensorShape([None]),
-                        'done': tf.TensorShape([None])}
+                        'continuing': tf.TensorShape([None])}
         return labels_type, labels_shape
 
     def __start_decision_process(self):

@@ -42,8 +42,8 @@ class Agent:
         self.__env.validation_episode = False
         if episode_counter == 100:
             print("State value of tracking states:")
-            for i, state in enumerate(self.__memory.tracking_state):
-                print(i, ":", self.__decision_maker.get_state_value(state))
+            for i, exp in enumerate(self.__memory.tracking_state):
+                print("{}, {}, {}".format(i, exp.reward, self.__decision_maker.get_state_value(exp.state)))
         if episode_counter % 100 == 0:
             print("Finishing episode: {}".format(episode_counter))
         if len(self.__memory) < self.__start_to_training:
@@ -53,8 +53,8 @@ class Agent:
             self.__decision_maker.train(self.__memory.remember_training_experiences,
                                         self.__memory.remember_evaluation_experiences)
             print("State value of tracking states:")
-            for i, state in enumerate(self.__memory.tracking_state):
-                print(i, ":", self.__decision_maker.get_state_value(state))
+            for i, exp in enumerate(self.__memory.tracking_state):
+                print("{}, {}, {}".format(i, exp.reward, self.__decision_maker.get_state_value(exp.state)))
         if episode_counter % self.__training_frequency < 20:
             self.__env.validation_episode = True
 

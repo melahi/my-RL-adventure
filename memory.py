@@ -11,7 +11,7 @@ class Memory:
                  number_of_actions,
                  training_capacity=100000,
                  validation_capacity=None,
-                 sampling_probability=0.01):
+                 sampling_probability=1):
         assert Memory.__check_environment_assumptions(observation_space), "The given `observation_space` does not" \
                                                                           "satisfy our assumptions"
         self.__state_shape = observation_space.shape
@@ -22,7 +22,7 @@ class Memory:
         self.__validation_experiences = collections.deque(maxlen=validation_capacity)
         self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
         self.__sampling_probability = sampling_probability
-        self.__short_term_memory = collections.deque(maxlen=20)
+        self.__short_term_memory = collections.deque()
         self.tracking_state = list()
 
     def __len__(self):
@@ -31,10 +31,14 @@ class Memory:
     def save_state(self, state, reward, action, next_state, done):
         experience = Experience(state, action, reward, next_state, done)
         self.__short_term_memory.append(experience)
-        if reward > 0 or (done and random.random() < self.__sampling_probability):
-            if len(self.tracking_state) == 0 and reward > 0:
+        if done and random.random() < self.__sampling_probability:
+            if len(self.tracking_state) == 0:
+                total_reward = 0
                 for exp in self.__short_term_memory:
-                    self.tracking_state.append(exp.state)
+                    total_reward += exp.reward
+                if total_reward > 0:
+                    for exp in self.__short_term_memory:
+                        self.tracking_state.append(exp)
             if random.random() < self.__validation_sampling_rate:
                 while len(self.__short_term_memory) > 0:
                     self.__validation_experiences.append(self.__short_term_memory.pop())
@@ -57,29 +61,29 @@ class Memory:
         actions = np.zeros([batch_size], dtype=np.uint8)
         rewards = np.zeros([batch_size])
         next_state = np.zeros(states_shape)
-        done = np.zeros(batch_size)
+        continuing = np.zeros(batch_size)
         batch_index = 0
         for experience in memorized_experiences:
             states[batch_index] = experience.state
             actions[batch_index] = experience.action
             rewards[batch_index] = experience.reward
             next_state[batch_index] = experience.next_state
-            done[batch_index] = float(experience.done)
+            continuing[batch_index] = 1.0 - float(experience.done)
             batch_index += 1
             if batch_index % batch_size == 0:
-                yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards, 'done': done})
+                yield (states, {'next_state': next_state, 'committed_action': actions, 'reward': rewards, 'continuing': continuing})
                 # creating another batch
                 batch_index = 0
                 states = np.zeros(states_shape)
                 actions = np.zeros([batch_size], dtype=np.uint8)
                 rewards = np.zeros([batch_size])
                 next_state = np.zeros(states_shape)
-                done = np.zeros(batch_size)
+                continuing = np.zeros(batch_size)
         if batch_index != 0:
             yield (states[:batch_index], {'next_state': next_state[:batch_index],
                                           'committed_action': actions[:batch_index],
                                           'reward': rewards[:batch_index],
-                                          'done': done[:batch_index]})
+                                          'continuing': continuing[:batch_index]})
 
     @staticmethod
     def __check_environment_assumptions(observation_space):
