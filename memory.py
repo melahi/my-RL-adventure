@@ -20,29 +20,28 @@ class Memory:
         if validation_capacity is None:
             validation_capacity = int(training_capacity / 10)
         self.__validation_experiences = collections.deque(maxlen=validation_capacity)
-        self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity)
+        self.__validation_sampling_rate = validation_capacity / (training_capacity + validation_capacity) * 0.01
         self.__sampling_probability = sampling_probability
         self.__short_term_memory = collections.deque()
         self.tracking_state = list()
+        self.__total_reward = 0
 
     def __len__(self):
         return len(self.__training_experiences)
 
     def save_state(self, state, reward, action, next_state, done):
+        self.__total_reward += reward
         experience = Experience(state, action, reward, next_state, done)
         self.__short_term_memory.append(experience)
-        if done and random.random() < self.__sampling_probability:
-            if len(self.tracking_state) == 0:
-                total_reward = 0
-                for exp in self.__short_term_memory:
-                    total_reward += exp.reward
-                if total_reward > 0:
-                    for exp in self.__short_term_memory:
-                        self.tracking_state.append(exp)
+        if done and self.__total_reward > 0:
+            self.__total_reward = 0
             if random.random() < self.__validation_sampling_rate:
                 while len(self.__short_term_memory) > 0:
                     self.__validation_experiences.append(self.__short_term_memory.pop())
             else:
+                if len(self.tracking_state) == 0:
+                    for exp in self.__short_term_memory:
+                        self.tracking_state.append(exp)
                 while len(self.__short_term_memory) > 0:
                     self.__training_experiences.append(self.__short_term_memory.pop())
         elif done:
